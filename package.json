@@ -2,6 +2,10 @@
   "name": "webpack-gmg-boilerplate",
   "version": "1.0.0",
   "description": "A boilerplate to kickstart development using Webpack, Gulp and AngularJS.",
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/guilhermegregio/webpack-boilerplate.git"
+  },
   "scripts": {
     "test": "gulp --gulpfile config/gulpfile.js test",
     "test:unit": "npm test -- --type=unit",
