@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "description": "A boilerplate to kickstart development using Webpack, Gulp and AngularJS.",
   "repository": {
-    "type" : "git",
-    "url" : "https://github.com/guilhermegregio/webpack-boilerplate.git"
+    "type": "git",
+    "url": "https://github.com/guilhermegregio/webpack-boilerplate.git"
   },
   "scripts": {
-    "test": "gulp --gulpfile config/gulpfile.js test",
+    "test": "gulp test",
     "test:unit": "npm test -- --type=unit",
     "test:e2e": "npm test -- --type=e2e",
-    "start": "gulp --gulpfile config/gulpfile.js dev"
+    "start": "gulp dev"
   },
   "author": "Guilherme Mangabeira Gregio<guilherme@gregio.net>",
   "license": "MIT",
@@ -24,10 +24,8 @@
     "del": "^1.2.0",
     "gulp": "^3.9.0",
     "gulp-env": "^0.2.0",
-    "gulp-exit": "0.0.2",
     "gulp-if": "^1.2.5",
     "gulp-jade": "^1.1.0",
-    "gulp-nodemon": "^2.0.3",
     "gulp-protractor": "^1.0.0",
     "gutil": "^1.6.4",
     "karma": "^0.12.37",
@@ -38,7 +36,6 @@
     "mocha": "^2.2.5",
     "optimist": "^0.6.1",
     "phantomjs": "^1.9.17",
-    "pm2": "^0.14.5",
     "raw-loader": "^0.5.1",
     "sprity": "^1.0.7",
     "style-loader": "^0.12.3",

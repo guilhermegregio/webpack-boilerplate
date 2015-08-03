@@ -1,6 +1,5 @@
 var gulp = require('gulp');
 var browserSync = require('browser-sync');
-var pm2 = require('pm2');
 var jade = require('gulp-jade');
 var webpack = require('webpack');
 var webpackDevServer = require("webpack-dev-server");
@@ -14,16 +13,18 @@ var argv = require('optimist').argv;
 var sprity = require('sprity');
 var gulpif = require('gulp-if');
 var del = require('del');
+var spawn = require('child_process').spawn;
+var proc1, proc2;
 
 var testConfig = {};
 testConfig.type = argv['type'] || 'unit';
 
 function webpackConfig() {
     var options = {
-        context: __dirname + '/../src',
+        context: __dirname + '/src',
         entry: './index.js',
         output: {
-            path: __dirname + '/../build/',
+            path: __dirname + '/build/',
             filename: 'bundle.js'
         },
         plugins: [
@@ -55,33 +56,38 @@ function webpackConfig() {
     return options;
 }
 
-gulp.task('server', ['sprites', 'webpack-dev-server'], function(cb) {
-    pm2.connect(function() {
-        pm2.start({
-            script: __dirname + '/../server.js', // Script to be run
-            exec_mode: 'cluster', // Allow your app to be clustered
-            instances: 4, // Optional: Scale your app by 4
-            max_memory_restart: '100M' // Optional: Restart your app if it reaches 100Mo
-        }, function(err, apps) {
-            cb();
-        });
+process.on('exit', function() {
+    if (proc1) proc1.kill();
+    if (proc2) proc2.kill();
+});
+
+gulp.task('server', ['webpack-dev-server'], function(cb) {
+    if (proc1) proc1.kill();
+
+    proc1 = spawn('node', ['./server.js']);
+    var started = false;
+
+    proc1.stdout.on('data', function(data) {
+        if (started) return;
+        started = true;
+        cb();
     });
 });
 
 gulp.task('json-server', function(cb) {
-    pm2.connect(function() {
-        pm2.start({
-            script: __dirname + '/../server/json-server.js', // Script to be run
-            exec_mode: 'cluster', // Allow your app to be clustered
-            instances: 4, // Optional: Scale your app by 4
-            max_memory_restart: '100M' // Optional: Restart your app if it reaches 100Mo
-        }, function(err, apps) {
-            cb();
-        });
+    if (proc2) proc2.kill();
+
+    proc2 = spawn('node', ['./server/json-server.js']);
+    var started = false;
+
+    proc2.stdout.on('data', function(data) {
+        if (started) return;
+        started = true;
+        cb();
     });
 });
 
-gulp.task('dev', ['server', 'json-server'], function() {
+gulp.task('dev', ['sprites', 'server', 'json-server'], function() {
     browserSync.init(null, {
         proxy: '127.0.0.1:3000',
         browser: 'google chrome',
@@ -90,11 +96,11 @@ gulp.task('dev', ['server', 'json-server'], function() {
 });
 
 gulp.task('index', function() {
-    var stream = gulp.src('../src/index.jade')
+    var stream = gulp.src('./src/index.jade')
         .pipe(jade({
             pretty: true,
         }))
-        .pipe(gulp.dest('../build/'));
+        .pipe(gulp.dest('./build/'));
 
     return stream;
 });
@@ -103,7 +109,7 @@ gulp.task('webpack-dev-server', ['index'], function(done) {
     var compiler = webpack(webpackConfig());
 
     new webpackDevServer(compiler, {
-        contentBase: '../build',
+        contentBase: './build',
         publicPath: '/build/',
         quiet: false,
         noInfo: false,
@@ -138,7 +144,7 @@ gulp.task('test-unit', function(done) {
     });
 
     var config = {
-        configFile: __dirname + '/karma.config.js',
+        configFile: __dirname + '/config/karma.config.js',
         singleRun: true
     };
 
@@ -153,9 +159,9 @@ gulp.task('test-local-browser', ['server', 'json-server' /*, 'webdriver_update'*
         'http://127.0.0.1:3000',
     ];
 
-    gulp.src("../test/e2e/*.spec.js")
+    gulp.src("./test/e2e/*.spec.js")
         .pipe(protractor({
-            configFile: __dirname + "/protractor.config.js",
+            configFile: __dirname + "/config/protractor.config.js",
             args: args
         }))
         .on('error', function(e) {
@@ -164,7 +170,6 @@ gulp.task('test-local-browser', ['server', 'json-server' /*, 'webdriver_update'*
             done();
         })
         .on('end', function() {
-            pm2.disconnect();
             done();
             process.exit();
         });
@@ -172,16 +177,18 @@ gulp.task('test-local-browser', ['server', 'json-server' /*, 'webdriver_update'*
 
 gulp.task('sprites', ['clean:sprites'], function() {
     return sprity.src({
-            src: '../src/images/**/*.{png,jpg}',
+            src: './src/images/**/*.{png,jpg}',
+            prefix: 'gmg',
+			split: false,
+			orientation: 'vertical',
             style: './sprite.css',
         })
-        .pipe(gulpif('*.png', gulp.dest('../build/images/'), gulp.dest('../build/css/')))
+        .pipe(gulpif('*.png', gulp.dest('./build/images/'), gulp.dest('./build/css/')))
 });
 
-
-gulp.task('clean:sprites', function (cb) {
-  del([
-	'../build/images/',
-	'../build/css/'
-  ], cb);
+gulp.task('clean:sprites', function(cb) {
+    del([
+        './build/images/',
+        './build/css/'
+    ], cb);
 });
