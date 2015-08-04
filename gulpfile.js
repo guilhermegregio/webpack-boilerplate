@@ -5,6 +5,7 @@ var webpack = require('webpack');
 var webpackDevServer = require("webpack-dev-server");
 var env = require('gulp-env')
 var gutil = require('gutil');
+var opn = require('opn');
 var protractor = require('gulp-protractor').protractor;
 var webdriver_standalone = require('gulp-protractor').webdriver_standalone;
 var webdriver_update = require('gulp-protractor').webdriver_update;
@@ -15,45 +16,19 @@ var gulpif = require('gulp-if');
 var del = require('del');
 var spawn = require('child_process').spawn;
 var proc1, proc2;
+var url = require('url');
+var proxy = require('proxy-middleware');
+var runSequence = require('run-sequence');
+
+var buildConfig = {};
+buildConfig.type = argv['build-type'] || 'development';
+buildConfig.environment = argv['build-environment'] || 'development';
 
 var testConfig = {};
 testConfig.type = argv['type'] || 'unit';
 
 function webpackConfig() {
-    var options = {
-        context: __dirname + '/src',
-        entry: './index.js',
-        output: {
-            path: __dirname + '/build/',
-            filename: 'bundle.js'
-        },
-        plugins: [
-            new webpack.DefinePlugin({
-                ON_TEST: process.env.NODE_ENV === 'test'
-            })
-        ],
-        module: {
-            loaders: [{
-                test: /\.js$/,
-                loader: 'babel',
-                exclude: /node_modules/
-            }, {
-                test: /\.html$/,
-                loader: 'raw',
-                exclude: /node_modules/
-            }, {
-                test: /\.css$/,
-                loader: 'style!css',
-                exclude: /node_modules/
-            }, {
-                test: /\.styl$/,
-                loader: 'style!css!stylus',
-                exclude: /node_modules/
-            }]
-        }
-    };
-
-    return options;
+    return require('./config/webpack.config.js');
 }
 
 process.on('exit', function() {
@@ -87,25 +62,40 @@ gulp.task('json-server', function(cb) {
     });
 });
 
-gulp.task('dev', ['sprites', 'server', 'json-server'], function() {
-    browserSync.init(null, {
-        proxy: '127.0.0.1:3000',
+gulp.task('dev:prepare', ['sprites', 'webpack-dev-server', 'json-server'], function() {
+    var webpackServer = url.parse('http://127.0.0.1:9001');
+
+    var jsonServer = url.parse('http://127.0.0.1:9002');
+    jsonServer.route = '/api';
+
+    browserSync.init({
+        server: {
+            baseDir: './build',
+            middleware: [proxy(jsonServer), proxy(webpackServer)]
+        },
+        open: false,
         browser: 'google chrome',
         port: 7000
     });
 });
 
+gulp.task('dev', ['dev:prepare'], function() {
+    opn('http://127.0.0.1:7000');
+});
+
 gulp.task('index', function() {
+	var pretty = process.env.NODE_ENV !== 'production';
+
     var stream = gulp.src('./src/index.jade')
         .pipe(jade({
-            pretty: true,
+            pretty: pretty,
         }))
         .pipe(gulp.dest('./build/'));
 
     return stream;
 });
 
-gulp.task('webpack-dev-server', ['index'], function(done) {
+gulp.task('webpack-dev-server', ['index'], function(cb) {
     var compiler = webpack(webpackConfig());
 
     new webpackDevServer(compiler, {
@@ -123,7 +113,7 @@ gulp.task('webpack-dev-server', ['index'], function(done) {
             throw new gutil.PluginError('webpack-dev-server', err);
         }
 
-        done();
+        cb();
     });
 });
 
@@ -135,7 +125,7 @@ gulp.task('test', function() {
     }
 });
 
-gulp.task('test-unit', function(done) {
+gulp.task('test-unit', function(cb) {
 
     env({
         vars: {
@@ -148,15 +138,15 @@ gulp.task('test-unit', function(done) {
         singleRun: true
     };
 
-    karma.start(config, done);
+    karma.start(config, cb);
 });
 
 gulp.task('webdriver_update', webdriver_update);
 
-gulp.task('test-local-browser', ['server', 'json-server' /*, 'webdriver_update'*/ ], function(done) {
+gulp.task('test-local-browser', ['dev:prepare'], function(cb) {
     var args = [
         '--baseUrl',
-        'http://127.0.0.1:3000',
+        'http://127.0.0.1:7000',
     ];
 
     gulp.src("./test/e2e/*.spec.js")
@@ -166,11 +156,11 @@ gulp.task('test-local-browser', ['server', 'json-server' /*, 'webdriver_update'*
         }))
         .on('error', function(e) {
             gutil.log(e);
-            pm2.disconnect();
-            done();
+            cb();
+            process.exit();
         })
         .on('end', function() {
-            done();
+            cb();
             process.exit();
         });
 });
@@ -179,8 +169,8 @@ gulp.task('sprites', ['clean:sprites'], function() {
     return sprity.src({
             src: './src/images/**/*.{png,jpg}',
             prefix: 'gmg',
-			split: false,
-			orientation: 'vertical',
+            split: false,
+            orientation: 'vertical',
             style: './sprite.css',
         })
         .pipe(gulpif('*.png', gulp.dest('./build/images/'), gulp.dest('./build/css/')))
@@ -191,4 +181,42 @@ gulp.task('clean:sprites', function(cb) {
         './build/images/',
         './build/css/'
     ], cb);
+});
+
+gulp.task('clean', function(cb) {
+    del([
+        './build/'
+    ], cb);
+});
+
+gulp.task('build', function(done) {
+    env({
+        vars: {
+            NODE_ENV: 'production'
+        }
+    });
+
+    runSequence(
+        'clean',
+        'index',
+		'sprites',
+        'webpack:build',
+        done
+    );
+});
+
+gulp.task('webpack:build', function(done){
+	var compiler = webpack(webpackConfig());
+
+    compiler.run(function(err, stats) {
+        if (err) {
+            throw new gutil.PluginError('webpack-build', err);
+        }
+
+        gutil.log("[build]", stats.toString({
+            colors: true
+        }));
+
+        done();
+    });
 });

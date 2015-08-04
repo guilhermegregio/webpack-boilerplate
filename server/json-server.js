@@ -10,7 +10,7 @@ var server = jsonServer.create();
 server.use(jsonServer.defaults);
 
 var router = jsonServer.router(dbLocation);
-server.use('/api/', router);
+server.use(router);
 
 server.listen(port, function(){
 	console.log('Server running on port ' + port);

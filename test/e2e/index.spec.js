@@ -11,7 +11,7 @@ describe('Protractor Demo App', function() {
 	var content = element(by.css('.red'));
 
     beforeEach(function() {
-        browser.get('http://localhost:3000');
+        browser.get('/');
     });
 
     it('should have a title', function() {
