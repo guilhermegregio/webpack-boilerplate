@@ -15,7 +15,7 @@ var sprity = require('sprity');
 var gulpif = require('gulp-if');
 var del = require('del');
 var spawn = require('child_process').spawn;
-var proc1, proc2;
+var proc2;
 var url = require('url');
 var proxy = require('proxy-middleware');
 var runSequence = require('run-sequence');
@@ -32,21 +32,7 @@ function webpackConfig() {
 }
 
 process.on('exit', function() {
-    if (proc1) proc1.kill();
     if (proc2) proc2.kill();
-});
-
-gulp.task('server', ['webpack-dev-server'], function(cb) {
-    if (proc1) proc1.kill();
-
-    proc1 = spawn('node', ['./server.js']);
-    var started = false;
-
-    proc1.stdout.on('data', function(data) {
-        if (started) return;
-        started = true;
-        cb();
-    });
 });
 
 gulp.task('json-server', function(cb) {
